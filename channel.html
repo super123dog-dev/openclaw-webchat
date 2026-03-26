@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Channel Management</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a1a; color: #e0e0e0; min-height: 100vh; }
+        .header { background: #252525; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #3d3d3d; }
+        .header h1 { font-size: 20px; font-weight: 500; }
+        .back-btn { background: #3d3d3d; color: #fff; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+        .back-btn:hover { background: #4d4d4d; }
+        .container { max-width: 1300px; margin: 0 auto; padding: 24px; }
+        .tip { background: #2a2a2a; border: 1px solid #3d3d3d; border-radius: 8px; padding: 16px; margin-bottom: 20px; font-size: 14px; line-height: 1.6; color: #ccc; }
+        .tip a { color: #6eb3f7; }
+
+        /* Stats bar */
+        .stats-bar { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+        .stat-card { background: #252525; border: 1px solid #3d3d3d; border-radius: 10px; padding: 16px 24px; flex: 1; min-width: 150px; }
+        .stat-card .stat-num { font-size: 28px; font-weight: 600; }
+        .stat-card .stat-label { font-size: 13px; color: #888; margin-top: 4px; }
+        .stat-card.ready .stat-num { color: #4ade80; }
+        .stat-card.installed .stat-num { color: #fb923c; }
+        .stat-card.offline .stat-num { color: #888; }
+
+        /* Channel grid - 3 columns */
+        #channel-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .channel-card { background: #252525; border-radius: 12px; padding: 20px; border: 1px solid #3d3d3d; transition: transform 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; gap: 12px; }
+        .channel-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+        .channel-card-header { display: flex; align-items: center; gap: 12px; }
+        .channel-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
+        .channel-info { flex: 1; min-width: 0; }
+        .channel-info h2 { font-size: 16px; font-weight: 500; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .channel-info .ch-desc { font-size: 12px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* Status badge */
+        .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+        .badge-ready { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
+        .badge-installed { background: rgba(251,146,60,0.15); color: #fb923c; border: 1px solid rgba(251,146,60,0.3); }
+        .badge-offline { background: rgba(255,255,255,0.05); color: #888; border: 1px solid #3d3d3d; }
+
+        /* Card footer */
+        .channel-actions { display: flex; gap: 8px; margin-top: auto; flex-wrap: wrap; }
+        .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; transition: background 0.15s; }
+        .btn-primary { background: #3b82f6; color: #fff; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-success { background: #16a34a; color: #fff; }
+        .btn-success:hover { background: #15803d; }
+        .btn-danger { background: #dc2626; color: #fff; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-secondary { background: #3d3d3d; color: #e0e0e0; }
+        .btn-secondary:hover { background: #4d4d4d; }
+        .btn-small { padding: 5px 12px; font-size: 12px; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Loading state */
+        .loading { display: flex; align-items: center; justify-content: center; padding: 60px; color: #888; gap: 10px; }
+        .spinner { width: 20px; height: 20px; border: 2px solid #3d3d3d; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Modal */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: #252525; border: 1px solid #3d3d3d; border-radius: 16px; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid #3d3d3d; }
+        .modal-header h2 { font-size: 18px; font-weight: 500; }
+        .modal-close { background: none; border: none; color: #888; font-size: 24px; cursor: pointer; padding: 0; line-height: 1; }
+        .modal-close:hover { color: #fff; }
+        .modal-body { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+
+        /* Form elements */
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 13px; color: #aaa; font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea { background: #1a1a1a; border: 1px solid #3d3d3d; border-radius: 8px; padding: 10px 12px; color: #e0e0e0; font-size: 14px; width: 100%; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: #3b82f6; }
+        .form-group .help-text { font-size: 11px; color: #777; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+        /* Command output */
+        #cmd-output { margin-top: 16px; padding: 16px; background: #000; border-radius: 8px; font-family: monospace; font-size: 13px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; color: #4ade80; display: none; }
+        #cmd-output.error { color: #f87171; }
+
+        /* QR login info */
+        .qr-info { text-align: center; padding: 20px; }
+        .qr-info .cmd-box { background: #000; border: 1px solid #3d3d3d; border-radius: 8px; padding: 16px; margin: 16px 0; font-family: monospace; color: #4ade80; font-size: 14px; word-break: break-all; }
+        .qr-info p { color: #888; font-size: 13px; line-height: 1.6; }
+
+        /* Install panel */
+        .install-panel { display: flex; flex-direction: column; gap: 12px; }
+        .install-panel .install-cmd { background: #000; border: 1px solid #3d3d3d; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 13px; color: #fb923c; }
+        .install-panel .install-note { font-size: 12px; color: #888; }
+
+        /* Error message */
+        .error-msg { color: #f87171; font-size: 13px; padding: 12px; background: rgba(248,113,113,0.1); border-radius: 8px; border: 1px solid rgba(248,113,113,0.2); display: none; }
+        .error-msg.visible { display: block; }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .form-row { grid-template-columns: 1fr; }
+            #channel-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📱 Channel Management</h1>
+        <div style="display:flex;gap:10px;align-items:center;">
+            <button class="back-btn" onclick="loadChannels()">🔄 Refresh</button>
+            <button class="back-btn" onclick="showCmdModal()">⚡ Commands</button>
+            <button class="back-btn" onclick="window.close()">Close</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Stats -->
+        <div class="stats-bar">
+            <div class="stat-card ready"><div class="stat-num" id="stat-ready">—</div><div class="stat-label">Ready</div></div>
+            <div class="stat-card installed"><div class="stat-num" id="stat-installed">—</div><div class="stat-label">Configured</div></div>
+            <div class="stat-card offline"><div class="stat-num" id="stat-total">—</div><div class="stat-label">Total Channels</div></div>
+        </div>
+
+        <!-- Quick commands -->
+        <div class="tip">
+            <strong>💡 Quick commands:</strong>
+            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-secondary btn-small" onclick="quickCmd('openclaw channels list')">📋 List</button>
+                <button class="btn btn-secondary btn-small" onclick="quickCmd('openclaw plugins list')">📦 Plugins</button>
+                <button class="btn btn-secondary btn-small" onclick="quickCmd('openclaw channels status')">📊 Status</button>
+                                                                <button class="btn btn-secondary btn-small" onclick="quickCmd('openclaw doctor')">🔧 Doctor</button>
+            </div>
+        </div>
+
+        <!-- Channel grid -->
+        <div id="channel-grid">
+            <div class="loading"><div class="spinner"></div>Loading channels...</div>
+        </div>
+    </div>
+
+    <!-- Config Modal -->
+    <div class="modal-overlay" id="config-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modal-title">Configure</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Command Modal -->
+    <div class="modal-overlay" id="cmd-modal">
+        <div class="modal" style="max-width:640px;">
+            <div class="modal-header">
+                <h2>⚡ Run OpenClaw Command</h2>
+                <button class="modal-close" onclick="closeCmdModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Command</label>
+                    <input type="text" id="cmd-input" placeholder="openclaw channels list" style="font-family:monospace;">
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-primary" onclick="execCmd()">Execute</button>
+                    <button class="btn btn-secondary" onclick="closeCmdModal()">Cancel</button>
+                </div>
+                <div id="cmd-output"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ── State ─────────────────────────────────────────────────────────────────
+        let channels = [];
+
+        // ── Load & render ─────────────────────────────────────────────────────────
+        async function loadChannels() {
+            document.getElementById('channel-grid').innerHTML =
+                '<div class="loading"><div class="spinner"></div>Loading channels...</div>';
+            try {
+                const res = await fetch('/api/channels/all');
+                const data = await res.json();
+                channels = data.channels || [];
+                renderChannels();
+                updateStats();
+            } catch (e) {
+                document.getElementById('channel-grid').innerHTML =
+                    '<div class="tip">❌ Failed to load channels: ' + e.message + '</div>';
+            }
+        }
+
+        function updateStats() {
+            const ready = channels.filter(c => c.state === 'ready').length;
+            const installed = channels.filter(c => c.state === 'installed_not_configured').length;
+            document.getElementById('stat-ready').textContent = ready;
+            document.getElementById('stat-installed').textContent = installed;
+            document.getElementById('stat-total').textContent = channels.length;
+        }
+
+        function renderChannels() {
+            const grid = document.getElementById('channel-grid');
+            if (!channels.length) {
+                grid.innerHTML = '<div class="tip">No channels found.</div>';
+                return;
+            }
+
+            grid.innerHTML = channels.map(ch => {
+                const badge = getBadge(ch.state);
+                const actions = getActions(ch);
+                const installNote = ch.state === 'not_installed'
+                    ? `<span style="font-size:11px;color:#777;">${ch.installType === 'npm' ? 'npm package' : 'bundled'} · ${ch.npmPackage || ch.id}</span>`
+                    : '';
+
+                return `
+                <div class="channel-card">
+                    <div class="channel-card-header">
+                        <div class="channel-icon" style="background:${iconBg(ch.iconClass)}">${ch.icon}</div>
+                        <div class="channel-info">
+                            <h2>${escapeHtml(ch.name)}</h2>
+                            <div class="ch-desc">${escapeHtml(ch.desc)}</div>
+                        </div>
+                    </div>
+                    <div>${badge}</div>
+                    ${installNote ? `<div>${installNote}</div>` : ''}
+                    <div class="channel-actions">${actions}</div>
+                </div>`;
+            }).join('');
+        }
+
+        function getBadge(state) {
+            if (state === 'ready')
+                return '<span class="badge badge-ready">🟢 Ready</span>';
+            if (state === 'installed_not_configured')
+                return '<span class="badge badge-installed">🟠 Not configured</span>';
+            return '<span class="badge badge-offline">⚪ Not installed</span>';
+        }
+
+        function getActions(ch) {
+            if (ch.state === 'not_installed') {
+                const installLabel = ch.installType === 'npm' && ch.npmPackage
+                    ? `⚡ Install ${ch.npmPackage}`
+                    : `⚡ Enable ${ch.name}`;
+                return `<button class="btn btn-primary btn-small" onclick="installChannel('${ch.id}')">${installLabel}</button>`;
+            }
+            if (ch.state === 'installed_not_configured') {
+                return `
+                    <button class="btn btn-success btn-small" onclick="openConfig('${ch.id}')">⚙️ Configure</button>
+                    <button class="btn btn-danger btn-small" onclick="removeChannel('${ch.id}')">Remove</button>`;
+            }
+            // ready
+            return `
+                <button class="btn btn-primary btn-small" onclick="openConfig('${ch.id}')">⚙️ Settings</button>
+                ${ch.requiresQR ? `<button class="btn btn-secondary btn-small" onclick="showQRLogin('${ch.id}')">🔗 Re-link</button>` : ''}
+                <button class="btn btn-danger btn-small" onclick="removeChannel('${ch.id}')">Remove</button>`;
+        }
+
+        function iconBg(iconClass) {
+            const map = {
+                telegram: '#0088cc', whatsapp: '#25D366', discord: '#5865F2',
+                signal: '#3A76F0', slack: '#4a154b', irc: '#4a4a4a',
+                line: '#00c300', matrix: '#0dbd8b', mattermost: '#0055ff',
+                msteams: '#6264a7', googlechat: '#4285f4', feishu: '#3370ff',
+                nostr: '#f0c000', zalo: '#0068ff', bluebubbles: '#ccc',
+                imessage: '#ccc', nextcloud: '#0082c9', synology: '#40bad3',
+                tlon: '#666', qqbot: '#12B7F5', twitch: '#9146ff'
+            };
+            return map[iconClass] || '#555';
+        }
+
+        // ── Install ───────────────────────────────────────────────────────────────
+        async function installChannel(chId) {
+            const ch = channels.find(c => c.id === chId);
+            if (!ch) return;
+
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = 'Installing...';
+
+            try {
+                const res = await fetch('/api/channels/install', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({channel: chId})
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`${ch.name} installed successfully! Refreshing...`, 'success');
+                    setTimeout(loadChannels, 2000);
+                } else {
+                    showError(data.message || 'Installation failed');
+                    btn.disabled = false;
+                    btn.textContent = '⚡ Install';
+                }
+            } catch (e) {
+                showError(e.message);
+                btn.disabled = false;
+                btn.textContent = '⚡ Install';
+            }
+        }
+
+        // ── Config modal ──────────────────────────────────────────────────────────
+        async function openConfig(chId) {
+            const ch = channels.find(c => c.id === chId);
+            if (!ch) return;
+
+            const title = document.getElementById('modal-title');
+            const body = document.getElementById('modal-body');
+            title.textContent = ch.name + ' Settings';
+
+            // Load current config
+            let config = {};
+            try {
+                const res = await fetch(`/api/channels/config/${chId}`);
+                config = await res.json();
+            } catch (e) {}
+
+            if (ch.requiresQR) {
+                // QR login channel — call API to get QR code
+                body.innerHTML = `<div class="qr-info"><div class="spinner" style="margin:0 auto;"></div><p style="margin-top:12px;">Getting QR code for ${escapeHtml(ch.name)}...</p></div>`;
+                fetch('/api/channels/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({channel: chId})
+                }).then(r => r.json()).then(data => {
+                    if (data.status === 'qr' && data.qrData) {
+                        // Got QR as image
+                        body.innerHTML = `
+                            <div class="qr-info">
+                                <p>${escapeHtml(ch.desc)}</p>
+                                <img src="${data.qrData}" style="max-width:300px;border:1px solid #333;border-radius:8px;margin:16px 0;" />
+                                <p>${escapeHtml(data.message || 'Scan this QR code with your app')}</p>
+                                <div style="margin-top:16px;display:flex;gap:8px;justify-content:center;">
+                                    <button class="btn btn-primary" onclick="openConfig('${chId}')">🔄 Refresh QR</button>
+                                    <button class="btn btn-secondary" onclick="closeModal()">Done</button>
+                                </div>
+                            </div>`;
+                    } else if (data.status === 'terminal_qr' && data.qrText) {
+                        // Got QR as terminal text
+                        body.innerHTML = `
+                            <div class="qr-info">
+                                <p>${escapeHtml(ch.desc)}</p>
+                                <pre style="background:#fff;color:#000;padding:16px;border-radius:8px;margin:16px 0;font-family:'Courier New',Courier,monospace;font-size:4px;line-height:4px;letter-spacing:0;display:inline-block;text-align:left;white-space:pre;overflow:hidden;">${escapeHtml(data.qrText)}</pre>
+                                <p>${escapeHtml(data.message || 'Scan this QR code with your app')}</p>
+                                <div style="margin-top:16px;display:flex;gap:8px;justify-content:center;">
+                                    <button class="btn btn-primary" onclick="openConfig('${chId}')">🔄 Refresh QR</button>
+                                    <button class="btn btn-secondary" onclick="closeModal()">Done</button>
+                                </div>
+                            </div>`;
+                    } else {
+                        // Fallback: show manual command
+                        const cmd = data.command || ch.loginCmd || ('openclaw channels login --channel ' + chId);
+                        const output = data.output ? `<pre style="background:#000;color:#fb923c;padding:12px;border-radius:8px;margin:12px 0;font-size:12px;max-height:200px;overflow-y:auto;text-align:left;">${escapeHtml(data.output)}</pre>` : '';
+                        body.innerHTML = `
+                            <div class="qr-info">
+                                <p>${escapeHtml(data.message || 'Could not get QR code automatically')}</p>
+                                ${output}
+                                <div class="cmd-box">${escapeHtml(cmd)}</div>
+                                <p>Run this command in terminal to get the QR code</p>
+                                <div style="margin-top:16px;display:flex;gap:8px;justify-content:center;">
+                                    <button class="btn btn-primary" onclick="openConfig('${chId}')">🔄 Retry</button>
+                                    <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+                                </div>
+                            </div>`;
+                    }
+                }).catch(e => {
+                    const cmd = ch.loginCmd || ('openclaw channels login --channel ' + chId);
+                    body.innerHTML = `
+                        <div class="qr-info">
+                            <p>Error: ${escapeHtml(e.message)}</p>
+                            <div class="cmd-box">${escapeHtml(cmd)}</div>
+                            <p>Run this command in terminal instead</p>
+                            <button class="btn btn-secondary" style="margin-top:12px;" onclick="closeModal()">Close</button>
+                        </div>`;
+                });
+            } else {
+                // Build form from configFields
+                body.innerHTML = buildConfigForm(ch, config);
+
+                // Add save handler
+                const form = body.querySelector('form');
+		if (form) {
+		    form.onsubmit = (e) => {
+		        e.preventDefault();
+			saveConfig(chId);
+		    };
+		 }
+            }
+
+            document.getElementById('config-modal').classList.add('active');
+        }
+
+
+        // Start QR/manual login for a channel
+        async function startChannelLogin(chId) {
+            const body = document.getElementById('modal-body');
+            body.innerHTML = '<div class="tip">正在获取登录信息...</div>';
+            
+            try {
+                const res = await fetch('/api/channels/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ channel: chId })
+                });
+                
+                const d = await res.json();
+                
+                if (d.qr || d.qr_ascii) {
+                    body.innerHTML = '<div class="tip">请扫码登录</div><div class="qr-container">' + 
+                        (d.qr ? '<img src="' + d.qr + '">' : '<pre style="font-size:8px;background:#fff;color:#000;padding:10px">' + d.qr_ascii + '</pre>') +
+                        '</div><p class="qr-status">请扫码...</p>';
+                } else if (d.message) {
+                    body.innerHTML = '<div class="tip">' + d.message + '</div>' +
+                        '<pre style="font-size:10px;background:#1a1a1a;padding:10px;overflow-x:auto;">' + (d.command || d.log || '') + '</pre>' +
+                        '<p style="color:#999;font-size:12px;margin-top:10px;">请在终端运行以上命令</p>';
+                } else {
+                    body.innerHTML = '<div class="tip">未知响应</div>';
+                }
+            } catch(e) {
+                body.innerHTML = '<div class="tip">错误: ' + e.message + '</div>';
+            }
+        }
+        
+        function buildConfigForm(ch, config) {
+    if (ch.requiresQR) {
+        return `<div class="tip">📱 此通道需要扫码登录</div>
+            <div style="margin-bottom:15px;">
+                <p>状态: <span style="color:${ch.state === 'running' ? '#4ade80' : '#f87171'}">${ch.state === 'running' ? '✅ 运行中' : '❌ 未运行'}</span></p>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="startChannelLogin('${ch.id}')" style="margin-bottom:10px;">📱 开始扫码登录</button>
+            <p style="color:#999;font-size:12px;">点击后将显示二维码或登录命令</p>`;
+    }
+    
+    const isReady = ch.state === 'ready' || ch.state === 'running' || ch.loaded;
+    if ((!ch.configFields || ch.configFields.length === 0) && isReady) {
+        return `<div class="tip">✅ ${ch.name} Optioned</div>
+            <p>Status: <span style="color:${ch.state === 'running' ? '#4ade80' : '#f87171'}">${ch.state === 'running' ? '✅ Running' : '❌ Stopped'}</span></p>
+            <p style="color:#999;font-size:12px;margin-top:10px;">Don't need option</p>`;
+    }
+    
+    let html = '<form>';
+    html += '<div id="config-error" class="error-msg"></div>';
+    for (const field of (ch.configFields || [])) {
+        const val = config[field.name] ?? field.default ?? '';
+        const help = field.help ? `<span class="help-text">${escapeHtml(field.help)}</span>` : '';
+        if (field.type === 'select') {
+            html += `<div class="form-group">
+                <label>${escapeHtml(field.label)}${field.required ? ' *' : ''}</label>
+                <select name="${field.name}" ${field.required ? 'required' : ''}>
+                    ${(field.options || []).map(opt => `<option value="${opt}" ${val === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+                </select>
+                ${help}
+            </div>`;
+        } else if (field.type === 'checkbox') {
+            html += `<div class="form-group" style="flex-direction:row;align-items:center;gap:8px;">
+                <input type="checkbox" name="${field.name}" id="f-${field.name}" ${val ? 'checked' : ''}>
+                <label for="f-${field.name}" style="margin:0;font-size:14px;">${escapeHtml(field.label)}</label>
+                ${help}
+            </div>`;
+        } else {
+            html += `<div class="form-group">
+                <label>${escapeHtml(field.label)}${field.required ? ' *' : ''}</label>
+                <input type="${field.type === 'password' ? 'password' : 'text'}"
+                       name="${field.name}"
+                       placeholder="${field.placeholder || ''}"
+                       value="${escapeAttr(String(val))}"
+                       ${field.required ? 'required' : ''}>
+                ${help}
+            </div>`;
+        }
+    }
+    html += `<div style="display:flex;gap:8px;margin-top:8px;">
+        <button type="submit" class="btn btn-success">💾 Save & Restart</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+    </div>
+    </form>`;
+    return html;
+}
+
+        async function saveConfig(chId) {
+            const form = document.querySelector('#modal-body form');
+            const errorEl = document.getElementById('config-error');
+            const formData = new FormData(form);
+            const config = {};
+
+            for (const [key, value] of formData.entries()) {
+                // Checkboxes
+                const checkbox = form.querySelector(`[name="${key}"][type="checkbox"]`);
+                config[key] = checkbox ? checkbox.checked : value;
+            }
+
+            errorEl.classList.remove('visible');
+            errorEl.textContent = '';
+
+            try {
+                const res = await fetch('/api/channels/configure', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({channel: chId, config})
+                });
+                const data = await res.json();
+                if (data.success) {
+                    closeModal();
+                    showToast('Configuration saved! Gateway restarting...', 'success');
+                    setTimeout(loadChannels, 3000);
+                } else {
+                    errorEl.textContent = data.message || 'Save failed';
+                    errorEl.classList.add('visible');
+                }
+            } catch (e) {
+                errorEl.textContent = e.message;
+                errorEl.classList.add('visible');
+            }
+        }
+
+        function showQRLogin(chId) {
+            const ch = channels.find(c => c.id === chId);
+            if (!ch || !ch.loginCmd) return;
+            openConfig(chId);
+        }
+
+        // ── Remove ───────────────────────────────────────────────────────────────
+        async function removeChannel(chId) {
+            const ch = channels.find(c => c.id === chId);
+            if (!ch) return;
+            if (!confirm(`Remove ${ch.name}? This disables the channel and removes its config.`)) return;
+
+            try {
+                const res = await fetch('/api/channels/remove', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({channel: chId})
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`${ch.name} removed. Restarting gateway...`, 'success');
+                    setTimeout(loadChannels, 2000);
+                } else {
+                    showError(data.message || 'Remove failed');
+                }
+            } catch (e) {
+                showError(e.message);
+            }
+        }
+
+        // ── Command modal ────────────────────────────────────────────────────────
+        function showCmdModal() {
+            document.getElementById('cmd-output').style.display = 'none';
+            document.getElementById('cmd-output').classList.remove('error');
+            document.getElementById('cmd-modal').classList.add('active');
+            document.getElementById('cmd-input').value = '';
+            document.getElementById('cmd-input').focus();
+        }
+
+        function closeCmdModal() {
+            document.getElementById('cmd-modal').classList.remove('active');
+        }
+
+        async function execCmd() {
+            const cmd = document.getElementById('cmd-input').value.trim();
+            if (!cmd) return;
+            const output = document.getElementById('cmd-output');
+            output.style.display = 'block';
+            output.classList.remove('error');
+            output.textContent = 'Executing...';
+
+            try {
+                const res = await fetch('/api/exec', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({command: cmd})
+                });
+                const data = await res.json();
+                const text = (data.stdout || '') + (data.stderr || '');
+                if (!text) {
+                    output.textContent = '(no output)';
+                } else {
+                    output.textContent = text;
+                    if (data.success === false) output.classList.add('error');
+                }
+            } catch (e) {
+                output.textContent = 'Error: ' + e.message;
+                output.classList.add('error');
+            }
+        }
+
+        // ── Quick command ────────────────────────────────────────────────────────
+        async function quickCmd(cmd) {
+            document.getElementById('cmd-input').value = cmd;
+            showCmdModal();
+            // Auto-execute after modal appears
+            setTimeout(execCmd, 100);
+        }
+
+        // ── Modal helpers ────────────────────────────────────────────────────────
+        function closeModal() {
+            document.getElementById('config-modal').classList.remove('active');
+        }
+
+        function showError(msg) {
+            alert('Error: ' + msg);
+        }
+
+        function showToast(msg, type) {
+            // Simple toast - could be improved
+            const div = document.createElement('div');
+            div.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:${type === 'success' ? '#16a34a' : '#dc2626'};color:#fff;padding:12px 24px;border-radius:8px;z-index:2000;font-size:14px;`;
+            div.textContent = msg;
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 4000);
+        }
+
+        // ── Utils ────────────────────────────────────────────────────────────────
+        function escapeHtml(s) {
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        function escapeAttr(s) {
+            return String(s).replace(/"/g, '&quot;');
+        }
+
+        // ── Init ─────────────────────────────────────────────────────────────────
+        loadChannels();
+    </script>
+</body>
+</html>

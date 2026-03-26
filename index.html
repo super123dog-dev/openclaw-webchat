@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        #login-page {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: #1a1a1a;
+        }
+        .login-box {
+            background: #252525;
+            padding: 32px 40px;
+            border-radius: 16px;
+            width: 360px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        .login-box h1 {
+            text-align: center;
+            margin-bottom: 24px;
+            font-size: 20px;
+            font-weight: 500;
+            color: #e0e0e0;
+        }
+        .login-box input {
+            width: 100%;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            background: #2d2d2d;
+            border: 1px solid #3d3d3d;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+        }
+        .login-box input:focus { border-color: #8ab4f8; }
+        .login-box button {
+            width: 100%;
+            padding: 14px;
+            background: #8ab4f8;
+            border: none;
+            border-radius: 8px;
+            color: #1a1a1a;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .login-box button:hover { background: #aecbfa; }
+        .login-box .error {
+            color: #f28b82;
+            text-align: center;
+            margin-top: 12px;
+            font-size: 13px;
+        }
+        
+        #chat-page {
+            display: none;
+            height: 100vh;
+            flex-direction: column;
+            background: #1a1a1a;
+        }
+        
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .chat-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        /* History Sidebar */
+        .history-sidebar {
+            width: 280px;
+            background: #1a1a1a;
+            border-left: 1px solid #3d3d3d;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .history-header {
+            padding: 16px;
+            border-bottom: 1px solid #3d3d3d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .history-header h2 {
+            font-size: 14px;
+            font-weight: 500;
+            color: #e8eaed;
+        }
+        .history-header button {
+            background: none;
+            border: none;
+            color: #9aa0a6;
+            cursor: pointer;
+            padding: 4px 8px;
+            font-size: 16px;
+            border-radius: 4px;
+        }
+        .history-header button:hover {
+            background: #3d3d3d;
+            color: #e8eaed;
+        }
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        .history-item {
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 4px;
+            transition: background 0.2s;
+        }
+        .history-item:hover {
+            background: #2d2d2d;
+        }
+        .history-item.active {
+            background: #3d3d3d;
+        }
+        .history-item-title {
+            font-size: 13px;
+            color: #e8eaed;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 4px;
+        }
+        .history-item-time {
+            font-size: 11px;
+            color: #5f6368;
+        }
+        .history-empty {
+            padding: 20px;
+            text-align: center;
+            color: #5f6368;
+            font-size: 13px;
+        }
+        
+        .header {
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #2d2d2d;
+        }
+        .header h1 { font-size: 14px; color: #9aa0a6; }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .header button {
+            background: none;
+            border: none;
+            color: #9aa0a6;
+            cursor: pointer;
+            padding: 8px;
+            font-size: 14px;
+        }
+        .header button:hover { color: #e8eaed; }
+        
+        .chat-container { flex: 1; overflow-y: auto; padding: 20px; }
+        .messages { max-width: 800px; margin: 0 auto; padding-bottom: 100px; }
+        
+        .message { margin-bottom: 24px; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message.user { text-align: right; }
+        
+        .message .bubble {
+            display: inline-block;
+            padding: 14px 18px;
+            border-radius: 20px;
+            max-width: 75%;
+            text-align: left;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+        .message.user .bubble {
+            background: #8ab4f8;
+            color: #1a1a1a;
+            border-bottom-right-radius: 4px;
+        }
+        .message.assistant .bubble {
+            background: #252525;
+            color: #e8eaed;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .input-area {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 280px;
+            padding: 20px;
+            background: linear-gradient(to top, #1a1a1a 80%, transparent);
+        }
+        .input-container {
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .input-wrapper {
+            flex: 1;
+            background: #252525;
+            border: 1px solid #3d3d3d;
+            border-radius: 24px;
+            padding: 12px 20px;
+        }
+        .input-wrapper:focus-within { border-color: #8ab4f8; }
+        .input-wrapper textarea {
+            flex: 1;
+            background: none;
+            border: none;
+            color: #e8eaed;
+            font-size: 15px;
+            font-family: inherit;
+            resize: none;
+            outline: none;
+            max-height: 200px;
+            width: 100%;
+        }
+        .input-wrapper textarea::placeholder { color: #5f6368; }
+        
+        .input-container button {
+            width: 48px;
+            height: 48px;
+            background: #8ab4f8;
+            border: none;
+            border-radius: 50%;
+            color: #1a1a1a;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        .input-container button:disabled { background: #3d3d3d; color: #5f6368; }
+        
+        .gateway-btn {
+            background: #3d3d3d;
+            border: 1px solid #4d4d4d;
+            color: #e8eaed;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .gateway-btn:hover { background: #4d4d4d; }
+        
+        .welcome { text-align: center; padding: 60px 20px; color: #9aa0a6; }
+        .welcome h2 { font-size: 28px; font-weight: 400; margin-bottom: 16px; color: #e8eaed; }
+        
+        .new-chat-btn {
+            margin: 8px;
+            padding: 10px;
+            background: #3d3d3d;
+            border: none;
+            border-radius: 8px;
+            color: #e8eaed;
+            cursor: pointer;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .new-chat-btn:hover { background: #4d4d4d; }
+        
+        .history-actions {
+            display: flex;
+            gap: 4px;
+            margin-top: 8px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .history-item:hover .history-actions { opacity: 1; }
+        .history-actions button {
+            background: none;
+            border: none;
+            color: #5f6368;
+            cursor: pointer;
+            padding: 4px;
+            font-size: 12px;
+        }
+        .history-actions button:hover { color: #f28b82; }
+        
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: #252525;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #3d3d3d;
+        }
+        .modal-header h2 { font-size: 18px; color: #e8eaed; }
+        .modal-close {
+            background: none;
+            border: none;
+            color: #9aa0a6;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+        .modal-close:hover { color: #e8eaed; }
+        
+        /* Model Manager Styles */
+        .mm-card {
+            background: #2d2d2d;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .mm-card h3 {
+            font-size: 13px;
+            color: #9aa0a6;
+            margin-bottom: 12px;
+        }
+        .mm-section-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .mm-section-title h3 { margin-bottom: 0; }
+        .mm-model-list { }
+        .mm-model-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            background: #252525;
+            border-radius: 6px;
+            margin-bottom: 6px;
+        }
+        .mm-model-item:last-child { margin-bottom: 0; }
+        .mm-model-name { font-size: 13px; color: #e8eaed; }
+        .mm-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            margin-left: 6px;
+        }
+        .mm-badge-primary { background: #4CAF50; color: white; }
+        .mm-badge-fallback { background: #2196F3; color: white; }
+        .mm-model-actions { display: flex; gap: 6px; }
+        .mm-btn {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .mm-btn-primary { background: #8ab4f8; color: #1a1a1a; }
+        .mm-btn-primary:hover { background: #aecbfa; }
+        .mm-btn-secondary { background: #2196F3; color: white; }
+        .mm-btn-secondary:hover { background: #1976D2; }
+        .mm-btn-warning { background: #FF9800; color: white; }
+        .mm-btn-warning:hover { background: #F57C00; }
+        .mm-btn-info { background: #17a2b8; color: white; padding: 4px 8px; }
+        .mm-btn-info:hover { background: #138496; }
+        .mm-btn-danger { background: #3d3d3d; color: #f28b82; }
+        .mm-btn-danger:hover { background: #4d4d4d; }
+        .mm-label {
+            display: block;
+            font-size: 12px;
+            color: #9aa0a6;
+            margin-bottom: 6px;
+        }
+        .mm-select, .mm-input {
+            width: 100%;
+            padding: 10px 12px;
+            background: #252525;
+            border: 1px solid #3d3d3d;
+            border-radius: 6px;
+            color: #e8eaed;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+        .mm-select:focus, .mm-input:focus { border-color: #8ab4f8; outline: none; }
+        .mm-key-url {
+            font-size: 12px;
+            color: #8ab4f8;
+            margin: 6px 0;
+        }
+        .mm-key-url a { color: #8ab4f8; text-decoration: none; }
+        .mm-key-url a:hover { text-decoration: underline; }
+        .mm-verify-status { margin-left: 10px; font-size: 12px; }
+        .mm-empty { color: #5f6368; font-size: 12px; text-align: center; padding: 16px; }
+    </style>
+</head>
+<body>
+    <div id="login-page">
+        <div class="login-box">
+            <h1>🔐 Login</h1>
+            <input type="text" id="username-input" placeholder="Username">
+            <input type="password" id="password-input" placeholder="Password">
+            <button onclick="login()">Login</button>
+            <div class="error" id="login-error"></div>
+        </div>
+    </div>
+
+    <div id="chat-page">
+        <div class="main-content">
+            <div class="chat-main">
+                <div class="header">
+                    <div class="header-left">
+                        <h1>🤖 Chat</h1>
+                        <a class="gateway-btn" id="gateway-link" href="#" target="_blank">🚀 Console</a>
+                        <button class="gateway-btn" onclick="showModelManager()">⚙️ Models</button>
+                        <button class="gateway-btn" onclick="window.open('/channel.html', '_blank')">📱 Channels</button>
+                    </div>
+                    <button onclick="logout()" title="Logout">🚪</button>
+                </div>
+                <div class="chat-container">
+                    <div class="messages" id="messages">
+                        <div class="welcome">
+                            <h2>Hello</h2>
+                            <p>How can I help you?</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="input-area">
+                    <div class="input-container">
+                        <div class="input-wrapper">
+                            <textarea id="message-input" placeholder="Send message to AI..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+                        </div>
+                        <button id="send-btn" onclick="sendMessage()">➤</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="history-sidebar">
+                <div class="history-header">
+                    <h2>History</h2>
+                    <button onclick="newChat()" title="New Chat">+</button>
+                </div>
+                <button class="new-chat-btn" onclick="newChat()">
+                    <span>+</span> New Chat
+                </button>
+                <div class="history-list" id="history-list">
+                    <div class="history-empty">No history yet</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/chat';
+        let API_KEY = '';
+        let models = [];
+        let currentModel = '';
+        let allSessions = {};
+        
+        // Read from openclaw.json via /config endpoint
+        async function fetchConfig() {
+            try {
+                const resp = await fetch('/config');
+                const cfg = await resp.json();
+                if (cfg.auth && cfg.auth.token) {
+                    DEFAULT_TOKEN = cfg.auth.token;
+                    const gwUrl = cfg.auth.gateway_url || 'http://localhost:18789';
+                    document.getElementById('gateway-link').href = gwUrl + '/?token=' + DEFAULT_TOKEN;
+                }
+                // Get models from cfg.models or cfg.agents?.defaults?.model
+                if (cfg.models && Object.keys(cfg.models).length > 0) {
+                    models = Object.keys(cfg.models);
+                } else if (cfg.agents && cfg.agents.defaults && cfg.agents.defaults.model) {
+                    // Try to get models from agents.defaults.model
+                    const m = cfg.agents.defaults.model;
+                    if (m.primary) models.push(m.primary);
+                    if (m.fallbacks) models = models.concat(m.fallbacks);
+                }
+                // Remove duplicates
+                models = [...new Set(models)];
+                if (!models.length) {
+                    console.warn('No models found in config, using default');
+                    models = [];
+                }
+            } catch(e) {
+                console.error('Failed to fetch config:', e);
+                models = [];
+            }
+            renderModelSelect();
+        }
+        
+        let DEFAULT_TOKEN = '';
+        
+        function init() {
+            loadConfig();
+            fetchConfig();
+            loadHistory();
+            const savedUser = localStorage.getItem('chat_user');
+            const savedKey = localStorage.getItem('chat_key');
+            if (savedUser && savedKey) {
+                API_KEY = savedKey;
+                showChat();
+            }
+        }
+        
+        async function loadHistory() {
+            try {
+                const resp = await fetch('/sessions');
+                if (resp.ok) {
+                    allSessions = await resp.json();
+                    renderHistory();
+                }
+            } catch(e) {
+                allSessions = {};
+            }
+        }
+        
+        function renderHistory() {
+            const list = document.getElementById('history-list');
+            const sessions = Object.keys(allSessions).sort((a, b) => {
+                const timeA = allSessions[a]?.updated || 0;
+                const timeB = allSessions[b]?.updated || 0;
+                return timeB - timeA;
+            });
+            
+            if (sessions.length === 0) {
+                list.innerHTML = '<div class="history-empty">No history yet</div>';
+                return;
+            }
+            
+            list.innerHTML = sessions.map(sid => {
+                const s = allSessions[sid];
+                const title = s?.title || getFirstMessage(sid) || 'New Chat';
+                const time = s?.updated ? new Date(s.updated * 1000).toLocaleDateString() : '';
+                const active = sid === localStorage.getItem('chat_session') ? 'active' : '';
+                return `
+                    <div class="history-item ${active}" onclick="switchSession('${sid}')">
+                        <div class="history-item-title">${esc(title)}</div>
+                        <div class="history-item-time">${time}</div>
+                        <div class="history-actions">
+                            <button onclick="event.stopPropagation(); deleteSession('${sid}')" title="Delete">🗑️</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function getFirstMessage(sid) {
+            const msgs = allSessions[sid]?.messages || [];
+            for (const m of msgs) {
+                if (m.role === 'user') return m.content.substring(0, 30) + (m.content.length > 30 ? '...' : '');
+            }
+            return '';
+        }
+        
+        function newChat() {
+            const newSid = 'session_' + Date.now();
+            localStorage.setItem('chat_session', newSid);
+            document.getElementById('messages').innerHTML = `
+                <div class="welcome">
+                    <h2>Hello</h2>
+                    <p>How can I help you?</p>
+                </div>
+            `;
+            renderHistory();
+            document.getElementById('message-input').focus();
+        }
+        
+        function switchSession(sid) {
+            localStorage.setItem('chat_session', sid);
+            loadSessionMessages(sid);
+            renderHistory();
+        }
+        
+        async function loadSessionMessages(sid) {
+            const msgsDiv = document.getElementById('messages');
+            msgsDiv.innerHTML = '';
+            
+            const s = allSessions[sid];
+            if (s && s.messages && s.messages.length > 0) {
+                s.messages.forEach(m => {
+                    addMsg(m.role, m.content);
+                });
+            } else {
+                msgsDiv.innerHTML = `
+                    <div class="welcome">
+                        <h2>Hello</h2>
+                        <p>How can I help you?</p>
+                    </div>
+                `;
+            }
+        }
+        
+        async function deleteSession(sid) {
+            if (!confirm('Delete this chat?')) return;
+            try {
+                const res = await fetch('/delete_session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sid })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    await loadHistory();
+                    if (localStorage.getItem('chat_session') === sid) {
+                        newChat();
+                    }
+                }
+            } catch(e) {
+                console.error('Delete failed:', e);
+                alert('Delete failed: ' + e.message);
+            }
+        }
+        
+        function renderModelSelect() {
+            if (!currentModel && models.length > 0) {
+                currentModel = models[0];
+                localStorage.setItem('chat_model', currentModel);
+            }
+        }
+        
+        function loadConfig() {
+            currentModel = localStorage.getItem('chat_model') || '';
+        }
+        
+        function login() {
+            const u = document.getElementById('username-input').value.trim();
+            const p = document.getElementById('password-input').value;
+            if (!u || !p) {
+                document.getElementById('login-error').textContent = 'Please enter username and password';
+                return;
+            }
+            
+            fetch('/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: u, password: p })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    localStorage.setItem('chat_user', u);
+                    localStorage.setItem('chat_key', data.token);
+                    API_KEY = data.token;
+                    showChat();
+                } else {
+                    document.getElementById('login-error').textContent = data.error || 'Invalid username or password';
+                }
+            })
+            .catch(e => {
+                document.getElementById('login-error').textContent = 'Login failed: ' + e.message;
+            });
+        }
+        
+        function logout() {
+            localStorage.removeItem('chat_user');
+            localStorage.removeItem('chat_key');
+            location.reload();
+        }
+        
+        function showChat() {
+            document.getElementById('login-page').style.display = 'none';
+            document.getElementById('chat-page').style.display = 'flex';
+            document.getElementById('message-input').focus();
+            loadHistory();
+        }
+        
+        function autoResize(t) { t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 200) + 'px'; }
+        function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
+        
+        async function sendMessage() {
+            const inp = document.getElementById('message-input');
+            const btn = document.getElementById('send-btn');
+            const txt = inp.value.trim();
+            if (!txt) return;
+            
+            // Local commands - don't call AI
+            if (txt.startsWith('/')) {
+                const cmd = txt.toLowerCase();
+                inp.value = ''; inp.style.height = 'auto';
+                
+                if (cmd === '/help') {
+                    addMsg('assistant', 'Available commands:\n/model - Show current model\n/models - Show available models\n/clear - Clear chat history\n/help - Show help\n\nPlus all OpenClaw commands: /status, /reasoning, etc.');
+                    return;
+                } else if (cmd === '/models') {
+                    let modelList = 'Available models:\n';
+                    models.forEach(m => { modelList += '- ' + m + '\n'; });
+                    addMsg('assistant', modelList);
+                    return;
+                } else if (cmd.startsWith('/model')) {
+                    const args = txt.split(' ');
+                    if (args.length > 1) {
+                        // Switch model: /model <name>
+                        const newModel = args[1];
+                        if (models.includes(newModel)) {
+                            currentModel = newModel;
+                            localStorage.setItem('chat_model', newModel);
+                            addMsg('assistant', 'Model switched to: ' + newModel);
+                        } else {
+                            addMsg('assistant', 'Model not found: ' + newModel + '\nAvailable: ' + models.join(', '));
+                        }
+                    } else {
+                        // Show current model
+                        try {
+                            const res = await fetch('/api/models/primary');
+                            const data = await res.json();
+                            addMsg('assistant', 'Current model: ' + data.primary);
+                        } catch(e) {
+                            const model = currentModel || (models.length > 0 ? models[0] : '');
+                            addMsg('assistant', 'Current model: ' + model);
+                        }
+                    }
+                    return;
+                } else if (cmd === '/clear') {
+                    let sessionId = localStorage.getItem('chat_session') || 'default';
+                    try {
+                        await fetch('/clear', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ session_id: sessionId })
+                        });
+                    } catch(e) {}
+                    document.getElementById('messages').innerHTML = `
+                        <div class="welcome">
+                            <h2>Hello</h2>
+                            <p>How can I help you?</p>
+                        </div>
+                    `;
+                    loadHistory();
+                    return;
+                }
+                // Unknown command - forward to gateway
+                let sessionId = localStorage.getItem('chat_session');
+                if (!sessionId) {
+                    sessionId = 'session_' + Date.now();
+                    localStorage.setItem('chat_session', sessionId);
+                }
+                const typ = addTyping();
+                btn.disabled = true; inp.disabled = true;
+                try {
+                    const resp = await fetch('/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + API_KEY },
+                        body: JSON.stringify({ message: txt, session_id: sessionId, model: currentModel || (models.length > 0 ? models[0] : '') })
+                    });
+                    typ.remove();
+                    const data = await resp.json();
+                    if (data.response) addMsg('assistant', data.response);
+                    else if (data.error) addMsg('assistant', 'Error: ' + data.error);
+                } catch(e) { typ.remove(); addMsg('assistant', 'Error: ' + e.message); }
+                btn.disabled = false; inp.disabled = false; inp.focus();
+                return;
+            }
+            
+            // Regular chat - call AI
+            let sessionId = localStorage.getItem('chat_session');
+            if (!sessionId) {
+                sessionId = 'session_' + Date.now();
+                localStorage.setItem('chat_session', sessionId);
+            }
+            
+            document.querySelector('.welcome')?.remove();
+            addMsg('user', txt);
+            inp.value = ''; inp.style.height = 'auto';
+            
+            const typ = addTyping();
+            btn.disabled = true; inp.disabled = true;
+            
+            try {
+                const resp = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + API_KEY },
+                    body: JSON.stringify({ 
+                        message: txt, 
+                        session_id: sessionId,
+                        model: currentModel || (models.length > 0 ? models[0] : '')
+                    })
+                });
+                typ.remove();
+                if (!resp.ok) throw new Error((await resp.text()) || 'Error ' + resp.status);
+                const data = await resp.json();
+                addMsg('assistant', data.response);
+                loadHistory();
+            } catch(e) {
+                typ.remove();
+                addMsg('assistant', '❌ Error: ' + e.message);
+            } finally {
+                btn.disabled = false; inp.disabled = false; inp.focus();
+            }
+        }
+        
+        function addMsg(role, c) {
+            const d = document.createElement('div');
+            d.className = 'message ' + role;
+            d.innerHTML = '<div class="bubble">' + esc(c) + '</div>';
+            document.getElementById('messages').appendChild(d);
+            d.scrollIntoView();
+        }
+        function addTyping() {
+            const d = document.createElement('div');
+            d.className = 'message assistant typing';
+            d.innerHTML = '<div class="bubble">Thinking...</div>';
+            document.getElementById('messages').appendChild(d);
+            return d;
+        }
+        function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+        
+        // Model Manager Modal
+        function showModelManager() {
+            document.getElementById('modelModal').classList.add('show');
+            loadMmProviders();
+            loadMmActive();
+        }
+        
+        function hideModelManager() {
+            document.getElementById('modelModal').classList.remove('show');
+        }
+        
+        async function loadMmProviders() {
+            const res = await fetch('/api/models/providers');
+            const data = await res.json();
+            const select = document.getElementById('mmProviderSelect');
+            data.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.dataset.keyUrl = p.keyUrl || '';
+                opt.text = `${p.name} (${p.modelCount})`;
+                select.appendChild(opt);
+            });
+        }
+        
+        async function loadMmActive() {
+            const res = await fetch('/api/models/active');
+            const data = await res.json();
+            const div = document.getElementById('mmActiveModels');
+            if (!data || data.length === 0) {
+                div.innerHTML = '<div class="mm-empty">No configured models</div>';
+                return;
+            }
+            div.innerHTML = data.map(m => `
+                <div class="mm-model-item">
+                    <div>
+                        <span class="mm-model-name">${m.provider}/${m.modelId}</span>
+                        ${m.isPrimary ? '<span class="mm-badge mm-badge-primary">Primary</span>' : ''}
+                        ${m.isFallback ? `<span class="mm-badge mm-badge-fallback">Fallback #${m.fallbackIndex !== undefined ? m.fallbackIndex + 1 : ''}</span>` : ''}
+                    </div>
+                    <div class="mm-model-actions">
+                        ${!m.isPrimary ? `<button class="mm-btn mm-btn-primary" onclick="mmSetPrimary('${m.provider}', '${m.modelId}')">Primary</button>` : ''}
+                        ${!m.isFallback ? `<button class="mm-btn mm-btn-secondary" onclick="mmSetFallback('${m.provider}', '${m.modelId}')">Fallback</button>` : ''}
+                        ${m.isFallback ? `<button class="mm-btn mm-btn-info" onclick="mmMoveFallback('${m.provider}', '${m.modelId}', 'up')">↑</button>` : ''}
+                        ${m.isFallback ? `<button class="mm-btn mm-btn-info" onclick="mmMoveFallback('${m.provider}', '${m.modelId}', 'down')">↓</button>` : ''}
+                        ${(m.isPrimary || m.isFallback) ? `<button class="mm-btn mm-btn-warning" onclick="mmClearRole('${m.provider}', '${m.modelId}')">Clear</button>` : ''}
+                        <button class="mm-btn mm-btn-danger" onclick="mmDeleteModel('${m.provider}', '${m.modelId}')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function mmOnProviderChange() {
+            const provider = document.getElementById('mmProviderSelect').value;
+            const urlDiv = document.getElementById('mmProviderKeyUrl');
+            const modelDiv = document.getElementById('mmModelSelection');
+            
+            document.getElementById('mmApiKey').value = '';
+            document.getElementById('mmVerifyStatus').innerHTML = '';
+            document.getElementById('mmAddBtn').disabled = true;
+            modelDiv.style.display = 'none';
+            
+            if (!provider) { urlDiv.innerHTML = ''; return; }
+            
+            const select = document.getElementById('mmProviderSelect');
+            const keyUrl = select.options[select.selectedIndex].dataset.keyUrl;
+            if (keyUrl) {
+                urlDiv.innerHTML = `<div class="mm-key-url">📌 Get Key: <a href="${keyUrl}" target="_blank">${keyUrl}</a></div>`;
+            } else {
+                urlDiv.innerHTML = '';
+            }
+        }
+        
+        async function mmVerifyKey() {
+            const provider = document.getElementById('mmProviderSelect').value;
+            const apiKey = document.getElementById('mmApiKey').value;
+            if (!provider || !apiKey) { alert('Please select provider and enter API Key'); return; }
+            
+            const res = await fetch('/api/models/verify', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({provider, apiKey})
+            });
+            const data = await res.json();
+            const status = document.getElementById('mmVerifyStatus');
+            const modelDiv = document.getElementById('mmModelSelection');
+            const modelSel = document.getElementById('mmModelSelect');
+            
+            if(data.valid) {
+                status.innerHTML = '✅';
+                const modelsRes = await fetch(`/api/models/list/${provider}`);
+                const modelsData = await modelsRes.json();
+                modelSel.innerHTML = '<option value="">-- Select Model --</option>';
+                if (modelsData.models && modelsData.models.length > 0) {
+                    modelsData.models.forEach(m => {
+                        const opt = document.createElement('option');
+                        opt.value = m; opt.text = m;
+                        modelSel.appendChild(opt);
+                    });
+                }
+                modelDiv.style.display = 'block';
+                document.getElementById('mmAddBtn').disabled = false;
+            } else {
+                status.innerHTML = '❌';
+                modelDiv.style.display = 'none';
+                document.getElementById('mmAddBtn').disabled = true;
+            }
+        }
+        
+        async function mmAddModel() {
+            const provider = document.getElementById('mmProviderSelect').value;
+            const modelId = document.getElementById('mmModelSelect').value;
+            const apiKey = document.getElementById('mmApiKey').value;
+            if (!provider || !modelId || !apiKey) { alert('Please complete all selections'); return; }
+            
+            const res = await fetch('/api/models/add', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({provider, modelId, modelName: modelId, apiKey, role: 'fallback'})
+            });
+            const data = await res.json();
+            if (data.status === 'success' || data.success === true) {
+                alert('✅ Model added!');
+                loadMmActive();
+                document.getElementById('mmApiKey').value = '';
+                document.getElementById('mmVerifyStatus').innerHTML = '';
+                document.getElementById('mmAddBtn').disabled = true;
+                document.getElementById('mmModelSelection').style.display = 'none';
+            } else {
+                alert('❌ ' + (data.error || 'Failed'));
+            }
+        }
+        
+        async function mmSetPrimary(provider, modelId) {
+            await fetch('/api/models/set_primary', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({provider, modelId})
+            });
+            loadMmActive();
+        }
+        
+        async function mmSetFallback(provider, modelId) {
+            await fetch('/api/models/set_fallback', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({provider, modelId})
+            });
+            loadMmActive();
+        }
+        
+        async function mmClearRole(provider, modelId) {
+            await fetch('/api/models/clear_role', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({provider, modelId})
+            });
+            loadMmActive();
+        }
+        
+        async function mmMoveFallback(provider, modelId, direction) {
+            await fetch('/api/models/move_fallback', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({provider, modelId, direction})
+            });
+            loadMmActive();
+        }
+        
+        async function mmDeleteModel(provider, modelId) {
+            if (!confirm(`Delete ${provider}/${modelId}?`)) return;
+            await fetch('/api/models/delete', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({provider, modelId})
+            });
+            loadMmActive();
+        }
+        
+        init();
+    </script>
+    
+    <!-- Model Manager Modal -->
+    <div id="modelModal" class="modal-overlay" onclick="if(event.target === this) hideModelManager()">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>⚙️ Model Manager</h2>
+                <button class="modal-close" onclick="hideModelManager()">×</button>
+            </div>
+            
+            <div class="mm-card">
+                <div class="mm-section-title">
+                    <h3>Configured Models</h3>
+                    <button class="mm-btn mm-btn-primary" onclick="loadMmActive()">🔄</button>
+                </div>
+                <div id="mmActiveModels"><div class="mm-empty">Loading...</div></div>
+            </div>
+            
+            <div class="mm-card">
+                <h3>➕ Add New Model</h3>
+                
+                <label class="mm-label">Select Provider:</label>
+                <select id="mmProviderSelect" class="mm-select" onchange="mmOnProviderChange()">
+                    <option value="">-- Select Provider --</option>
+                </select>
+                <div id="mmProviderKeyUrl"></div>
+                
+                <label class="mm-label">API Key:</label>
+                <div style="display:flex;align-items:center;">
+                    <input type="password" id="mmApiKey" class="mm-input" placeholder="Enter API Key" style="flex:1;margin-bottom:0;margin-right:10px;">
+                    <button class="mm-btn mm-btn-primary" onclick="mmVerifyKey()">🔑</button>
+                    <span id="mmVerifyStatus" class="mm-verify-status"></span>
+                </div>
+                
+                <div id="mmModelSelection" style="display:none;margin-top:12px;">
+                    <label class="mm-label">Select Model:</label>
+                    <select id="mmModelSelect" class="mm-select">
+                        <option value="">-- Select Model --</option>
+                    </select>
+                    <button class="mm-btn mm-btn-primary" id="mmAddBtn" onclick="mmAddModel()" disabled>➕ Add</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
