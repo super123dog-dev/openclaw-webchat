@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -393,7 +393,7 @@
         // Start QR/manual login for a channel
         async function startChannelLogin(chId) {
             const body = document.getElementById('modal-body');
-            body.innerHTML = '<div class="tip">正在获取登录信息...</div>';
+            body.innerHTML = '<div class="tip">Getting login info......</div>';
             
             try {
                 const res = await fetch('/api/channels/login', {
@@ -405,35 +405,45 @@
                 const d = await res.json();
                 
                 if (d.qr || d.qr_ascii) {
-                    body.innerHTML = '<div class="tip">请扫码登录</div><div class="qr-container">' + 
+                    body.innerHTML = '<div class="tip">Scan QR CodeLogin</div><div class="qr-container">' + 
                         (d.qr ? '<img src="' + d.qr + '">' : '<pre style="font-size:8px;background:#fff;color:#000;padding:10px">' + d.qr_ascii + '</pre>') +
-                        '</div><p class="qr-status">请扫码...</p>';
+                        '</div><p class="qr-status">Scan QR Code...</p>';
                 } else if (d.message) {
                     body.innerHTML = '<div class="tip">' + d.message + '</div>' +
                         '<pre style="font-size:10px;background:#1a1a1a;padding:10px;overflow-x:auto;">' + (d.command || d.log || '') + '</pre>' +
-                        '<p style="color:#999;font-size:12px;margin-top:10px;">请在终端运行以上命令</p>';
+                        '<p style="color:#999;font-size:12px;margin-top:10px;">Run the above command in terminal</p>';
                 } else {
-                    body.innerHTML = '<div class="tip">未知响应</div>';
+                    body.innerHTML = '<div class="tip">Unknown Response</div>';
                 }
             } catch(e) {
-                body.innerHTML = '<div class="tip">错误: ' + e.message + '</div>';
+                body.innerHTML = '<div class="tip">Error: ' + e.message + '</div>';
             }
         }
         
         function buildConfigForm(ch, config) {
     if (ch.requiresQR) {
-        return `<div class="tip">📱 此通道需要扫码登录</div>
+        return `<div class="tip">📱 This channel requires QR login</div>
             <div style="margin-bottom:15px;">
-                <p>状态: <span style="color:${ch.state === 'running' ? '#4ade80' : '#f87171'}">${ch.state === 'running' ? '✅ 运行中' : '❌ 未运行'}</span></p>
+                <p>Status: <span style="color:${ch.state === 'running' ? '#4ade80' : '#f87171'}">${ch.state === 'running' ? '✅ Running' : '❌ Not Running'}</span></p>
             </div>
-            <button type="button" class="btn btn-primary" onclick="startChannelLogin('${ch.id}')" style="margin-bottom:10px;">📱 开始扫码登录</button>
-            <p style="color:#999;font-size:12px;">点击后将显示二维码或登录命令</p>`;
+            <button type="button" class="btn btn-primary" onclick="startChannelLogin('${ch.id}')" style="margin-bottom:10px;">📱 Start QR Login</button>
+            <p style="color:#999;font-size:12px;">Click to show QR code or login command</p>`;
     }
     
     const isReady = ch.state === 'ready' || ch.state === 'running' || ch.loaded;
+    const hasConfig = ch.config && Object.keys(ch.config).length > 0;
     if ((!ch.configFields || ch.configFields.length === 0) && isReady) {
+        if (hasConfig) {
+            // Show read-only config
+            return `<div class="tip">✅ ${ch.name} Configured</div>
+                <p>Status: <span style="color:${isReady ? '#4ade80' : '#f87171'}">${isReady ? '✅ Running' : '❌ Stopped'}</span></p>
+                <details style="margin-top:10px;">
+                    <summary style="cursor:pointer;color:#999;font-size:12px;">View Configuration</summary>
+                    <pre style="background:#1a1a1a;padding:10px;border-radius:4px;font-size:11px;max-height:200px;overflow:auto;margin-top:8px;text-align:left;">${escapeHtml(JSON.stringify(ch.config, null, 2))}</pre>
+                </details>`;
+        }
         return `<div class="tip">✅ ${ch.name} Optioned</div>
-            <p>Status: <span style="color:${ch.state === 'running' ? '#4ade80' : '#f87171'}">${ch.state === 'running' ? '✅ Running' : '❌ Stopped'}</span></p>
+            <p>Status: <span style="color:${isReady ? '#4ade80' : '#f87171'}">${isReady ? '✅ Running' : '❌ Stopped'}</span></p>
             <p style="color:#999;font-size:12px;margin-top:10px;">Don't need option</p>`;
     }
     
