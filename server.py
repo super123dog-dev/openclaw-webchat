@@ -854,14 +854,95 @@ def remove_channel(ch_id):
         return False, str(e)
 
 
+def install_channel(ch_id):
+    """Install/enable a channel plugin."""
+    try:
+        import subprocess
+        import json
+        # Find plugin that provides this channel from plugins list
+        result = subprocess.run(['openclaw', 'plugins', 'list', '--json'], capture_output=True, text=True, timeout=30)
+        start = result.stdout.find('{')
+        data = json.loads(result.stdout[start:])
+        target_plugin = None
+        for plugin in data.get('plugins', []):
+            if ch_id in plugin.get('channelIds', []):
+                target_plugin = plugin['id']
+                break
+        
+        # If not found by channelIds, try using channel id as plugin name
+        if not target_plugin:
+            for plugin in data.get('plugins', []):
+                if plugin.get('id') == ch_id or ch_id in plugin.get('channelIds', []):
+                    target_plugin = plugin['id']
+                    break
+        
+        # If still not found, use the channel id directly as package name
+        if not target_plugin:
+            target_plugin = ch_id
+        
+        # Check if it's an npm plugin (needs to be installed)
+        plugin = next((p for p in data.get('plugins', []) if p.get('id') == target_plugin), None)
+        npm_pkg = plugin.get('npmPackage') if plugin else None
+        
+        if npm_pkg:
+            # Install via openclaw plugins install - e.g., "openclaw plugins install line"
+            # Run in background to avoid blocking
+            pkg_name = npm_pkg.split('/')[-1] if '/' in npm_pkg else npm_pkg.replace('@openclaw/', '')
+            subprocess.Popen(['openclaw', 'plugins', 'install', pkg_name], 
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif target_plugin != ch_id:
+            # Plugin exists but no npm package, just enable it
+            subprocess.Popen(['openclaw', 'plugins', 'enable', target_plugin],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            # Try installing channel id directly as package
+            subprocess.Popen(['openclaw', 'plugins', 'install', ch_id],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        # Enable plugin - run in background
+        subprocess.Popen(['openclaw', 'plugins', 'enable', target_plugin],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        # Restart gateway - run in background
+        subprocess.Popen(['openclaw', 'gateway', 'restart'],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True, f'Channel {ch_id} installation started via plugin {target_plugin}'
+    except Exception as e:
+        return False, str(e)
+
+
+def configure_channel(ch_id, config_updates):
+    """Configure a channel in openclaw.json."""
+    try:
+        cfg = load_config()
+        if 'channels' not in cfg:
+            cfg['channels'] = {}
+        if ch_id not in cfg['channels']:
+            cfg['channels'][ch_id] = {}
+        cfg['channels'][ch_id].update(config_updates)
+        save_config(cfg)
+        # Restart gateway
+        subprocess.Popen(['openclaw', 'gateway', 'restart'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True, f'Channel {ch_id} configured'
+    except Exception as e:
+        return False, str(e)
+
+
 def get_all_channels():
     """Return ALL channel plugins from CHANNEL_REGISTRY + runtime status overlay."""
     
     try:
         import subprocess
         result = subprocess.run(['openclaw', 'plugins', 'list', '--json'], 
-                              capture_output=True, text=True, timeout=15)
-        plugins_data = json.loads(result.stdout)
+                              capture_output=True, text=True, timeout=30)
+        output = result.stdout.strip()
+        # Extract JSON part (from first '{' to last '}')
+        start = output.find('{')
+        end = output.rfind('}') + 1
+        if start >= 0 and end > start:
+            plugins_data = json.loads(output[start:end])
+        else:
+            raise ValueError("No JSON found")
     except Exception as e:
         print(f"Error getting plugins: {e}")
         plugins_data = {'plugins': []}
@@ -869,11 +950,15 @@ def get_all_channels():
     openclaw_cfg = load_config()
     channels_cfg = openclaw_cfg.get('channels', {})
     
-    # Build plugin status lookup
+    # Build plugin status lookup (by plugin id AND by channel id)
     plugin_status_map = {}
+    channel_to_plugin = {}  # channel id -> plugin id mapping
     for plugin in plugins_data.get('plugins', []):
         pid = plugin.get('id', '')
         plugin_status_map[pid] = plugin.get('status', 'not_installed')
+        # Map each channel id to this plugin
+        for ch_id in plugin.get('channelIds', []):
+            channel_to_plugin[ch_id] = pid
     
     # Sensitive keys to mask
     sensitive_keys = {'botToken', 'token', 'password', 'appSecret', 'clientSecret',
@@ -884,7 +969,9 @@ def get_all_channels():
     
     # Iterate CHANNEL_REGISTRY to include all channels
     for ch_id, reg in CHANNEL_REGISTRY.items():
-        plugin_status = plugin_status_map.get(ch_id, 'not_installed')
+        # Get plugin id for this channel, then get its status
+        plugin_id = channel_to_plugin.get(ch_id, '')
+        plugin_status = plugin_status_map.get(plugin_id, 'not_installed')
         ch_cfg = channels_cfg.get(ch_id, {})
         enabled = ch_cfg.get('enabled', False)
         
@@ -914,6 +1001,33 @@ def get_all_channels():
             'config': {k: v for k, v in ch_cfg.items() if k not in sensitive_keys},
             'hasCredentials': bool(ch_cfg),
         })
+    
+    # Also add channels from plugins that are not in CHANNEL_REGISTRY
+    existing_ch_ids = set(CHANNEL_REGISTRY.keys())
+    for plugin in plugins_data.get('plugins', []):
+        plugin_status = plugin.get('status', 'not_installed')
+        for ch_id in plugin.get('channelIds', []):
+            if ch_id in existing_ch_ids:
+                continue
+            if plugin_status != 'loaded':
+                continue
+            ch_cfg = channels_cfg.get(ch_id, {})
+            enabled = ch_cfg.get('enabled', False)
+            state = 'ready' if enabled else 'installed_not_configured'
+            result.append({
+                'id': ch_id,
+                'name': plugin.get('name', ch_id.title()),
+                'icon': '💬',
+                'iconClass': ch_id,
+                'desc': plugin.get('description', ''),
+                'requiresQR': False,
+                'authType': 'token',
+                'configFields': [],
+                'state': state,
+                'config': {k: v for k, v in ch_cfg.items() if k not in sensitive_keys},
+                'hasCredentials': bool(ch_cfg),
+            })
+            existing_ch_ids.add(ch_id)
     
     print(f"[channels] Returning {len(result)} channels ({sum(1 for c in result if c['state'] != 'not_installed')} active)")
     return result
