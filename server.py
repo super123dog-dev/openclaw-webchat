@@ -516,6 +516,23 @@ CHANNEL_REGISTRY = {
         'loginCmd': None,
         'docs': 'https://docs.openclaw.ai/channels/msteams',
     },
+    'qqbot': {
+        'name': 'QQ Bot',
+        'icon': '💬',
+        'iconClass': 'qqbot',
+        'desc': 'QQ 开放平台 Bot API，支持 C2C、群聊、频道消息及富媒体',
+        'requiresQR': False,
+        'installType': 'bundled',
+        'npmPackage': None,
+        'configFields': [
+            {'name': 'appId', 'label': 'App ID', 'type': 'text', 'required': True,
+             'placeholder': '从 QQ 开放平台获取 App ID'},
+            {'name': 'clientSecret', 'label': 'App Secret', 'type': 'password', 'required': True,
+             'placeholder': '从 QQ 开放平台获取 App Secret'},
+        ],
+        'loginCmd': None,
+        'docs': 'https://docs.openclaw.ai/channels/qqbot',
+    },
     'googlechat': {
         'name': 'Google Chat', 'icon': '💬', 'iconClass': 'googlechat',
         'desc': 'Service account JSON key file path',
